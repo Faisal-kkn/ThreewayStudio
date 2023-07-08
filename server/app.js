@@ -11,7 +11,10 @@ dotenv.config();
 
 const app = express();
 
-// import user from './routes/user.js'
+import authentication from './routes/authentication.js'
+import manufacturer from './routes/manufacturer.js'
+import transporter from './routes/transporter.js'
+import common from './routes/common.js'
 
 app.use(bodyParser.json({ limit: "30mb", extended: true }));
 app.use(bodyParser.urlencoded({ limit: "30mb", extended: true }));
@@ -36,7 +39,10 @@ mongoose.connect(CONNECTION_URL, {
 
 
 
-// app.use('/api/', user)
+app.use('/authentication', authentication)
+app.use('/manufacturer', manufacturer)
+app.use('/transporter', transporter)
+app.use('/common', common)
 
 
 // app.use(function (err, req, res, next) {

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-let RegisterSchema = new mongoose.Schema({
+const RegisterSchema = new mongoose.Schema({
     username: {
         type: String,
         required: true
@@ -10,6 +10,10 @@ let RegisterSchema = new mongoose.Schema({
         required: true
     },
     password: {
+        type: String,
+        required: true
+    },
+    address: {
         type: String,
         required: true
     },
@@ -31,4 +35,7 @@ let RegisterSchema = new mongoose.Schema({
     },
 });
 
-export default mongoose.model('users', RegisterSchema)
+RegisterSchema.index({ email: 1 });
+RegisterSchema.index({ userType: 1 });
+
+export default mongoose.model('Users', RegisterSchema)
