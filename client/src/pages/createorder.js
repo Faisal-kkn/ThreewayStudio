@@ -29,7 +29,6 @@ const CreateOrder = () => {
                 const [email, name, userRole] = userValue.split(' ');
                 setUserRoleData(userRole)
             } else {
-                console.log('looooooooo');
                 router.push("/login")
             }
         }
@@ -50,7 +49,6 @@ const CreateOrder = () => {
                 if (response.status === false) {
                     // setResponseError(response.msg);
                 } else {
-                    console.log(response, 'resssssssssss');
                     if (response.auth === false) router.push('/login')
                     setTransporters(response);
                 }
@@ -100,7 +98,6 @@ const CreateOrder = () => {
             }
         } else {
             console.log('CreateOrder error', res);
-            console.log({ response });
         }
     };
 
