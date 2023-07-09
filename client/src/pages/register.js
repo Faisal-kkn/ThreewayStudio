@@ -80,7 +80,7 @@ export default function Register() {
 
     return (
         <main className='flex justify-center items-center w-full min-h-screen'>
-            <div className="bg-white rounded-2xl shadow-2xl flex w-2/3 max-w-4xl ">
+            <div className="bg-white rounded-2xl shadow-2xl md:flex md:w-2/3 max-w-4xl ">
                 <div className='p-5 w-12/12 md:w-6/12 lg:w-6/12'>
                     <div className='text-left font-bold'>
                         <span className="text-primary">Threeway</span>Studio
