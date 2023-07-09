@@ -50,14 +50,12 @@ export default {
     updateOrderStatus: async (req, res) => {
         try {
             const { status, Id, price } = req.body
-            console.log(req.body);
             manufacturerFormSchema.updateOne({ _id: Id }, {
                 $set: {
                     status,
                     price
                 }
             }).then((response) => {
-                console.log({response});
                 res.status(200).json(response)
             }).catch(console.error);
         } catch (error) {

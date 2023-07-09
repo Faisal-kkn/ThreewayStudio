@@ -7,8 +7,6 @@ export default async function updateOrderStatus(req, res) {
             const API_URL = process.env.NEXT_PUBLIC_API_URL;
             const accessToken = req.headers?.authorization?.split(' ')[1];
             const orderData = req.body.data;
-            console.log(orderData, 'orderData');
-            console.log({ accessToken });
             const response = await axios.post(`${API_URL}/manufacturer/updateOrderStatus`, orderData, {
                 headers: {
                     'Content-Type': 'application/json',

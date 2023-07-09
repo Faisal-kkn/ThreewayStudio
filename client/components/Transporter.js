@@ -10,7 +10,6 @@ function Manufacturer({ userRole }) {
 
     const fetchTransportersOrders = useCallback(async () => {
         try {
-            console.log('callleeeee');
             const res = await fetch(`api/getTransporterOrders`, {
                 method: 'GET',
                 headers: {
@@ -20,13 +19,11 @@ function Manufacturer({ userRole }) {
             });
 
             const response = await res.json();
-            console.log({ response });
             if (res.status === 200) {
                 if (response.status === false) {
                     // setResponseError(response.msg);
                 } else {
                     if (response.auth === false) router.push('/login')
-                    console.log(response, 'response order get');
                     setOrderRequests(response);
                 }
             } else {
@@ -67,7 +64,6 @@ function Manufacturer({ userRole }) {
 
 
             const response = await res.json();
-            console.log({ response });
             if (res.status === 200) {
                 if (response.status === false) {
                     // setResponseError(response.msg);
@@ -96,7 +92,6 @@ function Manufacturer({ userRole }) {
             });
 
             const response = await res.json();
-            console.log({ response });
             if (res.status === 200) {
                 if (response.status === false) {
                     // setResponseError(response.msg);
