@@ -5,10 +5,12 @@ import { useRouter } from 'next/router';
 import { ComputerDesktopIcon, UserIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/outline";
 import Link from 'next/link';
 import jwt from 'jwt-decode'
+import { useSocketContext } from '../context/socket'
 
 
 const SideNav = ({ userRole }) => {
 
+    const { socket } = useSocketContext();
     const router = useRouter();
 
     const [layouts, setLayouts] = useState([])
@@ -18,11 +20,6 @@ const SideNav = ({ userRole }) => {
             Icon: 'ComputerDesktopIcon',
             title: 'Dashboard',
             link: '/'
-        },
-        {
-            Icon: '',
-            title: 'Order',
-            link: '/createorder'
         },
         {
             Icon: '',
@@ -49,6 +46,18 @@ const SideNav = ({ userRole }) => {
         },
     ]
 
+    const [userData, setUserData] = useState({
+        id: '',
+        name: '',
+        email: ''
+    })
+
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+        }
+    }, [userRole])
+
     useEffect(() => {
         if (typeof window !== 'undefined') {
             if (userRole === "transporter") {
@@ -56,13 +65,28 @@ const SideNav = ({ userRole }) => {
             } else if (userRole === "manufacturer") {
                 setLayouts(manufacturerLayout)
             }
+
+            if (localStorage.getItem("userToken")) {
+                const jwtDecode = jwt(localStorage.getItem("userToken"));
+                const userValue = jwtDecode.user;
+                const [email, name, userRole, userId] = userValue.split(' ');
+                setUserData({ ...userData, email, name, id: userId })
+            } else {
+                router.push("/login")
+            }
         }
-    }, [userRole])
+    }, [])
+
 
     const logout = () => {
         localStorage.removeItem('userToken');
         router.push("/login");
     };
+
+    useEffect(() => {
+        socket?.emit("addUser", userData.id)
+    }, [socket])
+
 
 
     const jwtValidation = useCallback(async () => {

@@ -8,7 +8,7 @@ export default {
         try {
             const decodedToken = Jwt.verify(req.headers.authorization, process.env.USER_JWT_SECRET);
             const userValue = decodedToken.user;
-            const [email, name] = userValue.split(' ');
+            const [email, name, userRole, userId] = userValue.split(' ');
             const getUser = await authenticationSchema.findOne({ email })
             let conditions;
             if (getUser?.userType === "manufacturer") {
@@ -32,5 +32,13 @@ export default {
         } catch (error) {
             res.status(501).json({ message: error.message });
         }
-    }
+    },
+    getUser: async (req, res) => {
+        try {
+            const result = await authenticationSchema.findOne({ _id: req.query.userId })
+            res.status(200).json(result)
+        } catch (error) {
+            res.status(501).json({ message: error.message });
+        }
+    },
 }

@@ -33,7 +33,7 @@ export default {
             if (userData) {
                 let passwordCheck = await bcrypt.compare(password, userData.password)
                 if (passwordCheck) {
-                    const user = userData.email + ' ' + userData.username + ' ' + userData.userType
+                    const user = userData.email + ' ' + userData.username + ' ' + userData.userType + ' ' + userData._id
                     let token = jwt.sign({ user }, process.env.USER_JWT_SECRET, { expiresIn: 30000 });
                     res.status(200).json({ status: true, auth: true, token })
                 } else res.json({ status: false, msg: 'Password is incorrect' })

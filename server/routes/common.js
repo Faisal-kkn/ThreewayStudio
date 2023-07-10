@@ -5,5 +5,6 @@ import { verifyUserJWT } from './auth.js'
 
 
 router.get('/searchOrder', verifyUserJWT, common.searchOrder)
+router.get('/user', verifyUserJWT, common.getUser)
 
 export default router;

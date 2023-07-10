@@ -4,9 +4,10 @@ export default async function createOrder(req, res) {
     try {
         if (req.method === 'POST') {
             const API_URL = process.env.NEXT_PUBLIC_API_URL
-            const userData = req.body.data;
+            const userData = req.body;
+            console.log(userData);
             const accessToken = req.headers?.authorization?.split(' ')[1];
-            const response = await axios.post(`${API_URL}/manufacturer/order`, userData, {
+            const response = await axios.post(`${API_URL}/chat/new-message`, userData, {
                 headers: {
                     'authorization': accessToken
                 }
