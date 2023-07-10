@@ -1,12 +1,12 @@
 import axios from 'axios';
 
-export default async function createOrder(req, res) {
+export default async function getUser(req, res) {
     try {
-        if (req.method === 'POST') {
-            const API_URL = process.env.NEXT_PUBLIC_API_URL
-            const userData = req.body.data;
+        if (req.method === 'GET') {
+            const { userId } = req.query
+            const API_URL = process.env.NEXT_PUBLIC_API_URL;
             const accessToken = req.headers?.authorization?.split(' ')[1];
-            const response = await axios.post(`${API_URL}/manufacturer/order`, userData, {
+            const response = await axios.get(`${API_URL}/common/user?userId=${userId}`, {
                 headers: {
                     'authorization': accessToken
                 }
