@@ -1,27 +1,68 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router';
-import { EnvelopeIcon, LockClosedIcon, UserCircleIcon, HomeIcon, UserGroupIcon } from "@heroicons/react/24/outline";
-import { useForm } from "react-hook-form";
+import jwt from 'jwt-decode'
 
-import FormInput from '../../components/FormInput';
-import Button from '../../components/Button';
 import Layout from '../../components/Layout'
+import Conversation from '../../components/Chat/Conversation';
+import MsgContent from '../../components/Chat/MsgContent';
+import { useSocketContext } from '../../context/socket';
+
 
 const CreateOrder = () => {
+    const { socket } = useSocketContext();
 
     const router = useRouter();
 
-    const { register, handleSubmit, watch, formState: { errors } } = useForm();
+    const [userRoleData, setUserRoleData] = useState('');
+    const [userData, setUserData] = useState({
+        id: '',
+        name: '',
+        email: ''
+    })
 
-    const [orderData, setOrderData] = useState({ from: '', to: '', quantity: '1ton', transporter: '' });
-    const [dropError, setDropError] = useState({});
-    const [responseError, setResponseError] = useState('');
-    const [transporters, setTransporters] = useState([])
+    const [conversations, setConversations] = useState([])
+    const [currentChat, setCurrentChat] = useState(null)
+    const [messages, setMessages] = useState([])
+    const [newMessage, setNewMessage] = useState("")
+    const [arrivalMessages, setArrivalMessages] = useState(null)
 
+    useEffect(() => {
+        socket?.on('getMessage', (data) => {
+            console.log(data, 'get msg');
+            setArrivalMessages({
+                sender: data.senderId,
+                text: data.text,
+                createdAt: Date.now(),
+            })
+        })
+    }, [socket, messages, arrivalMessages])
 
-    const fetchTransporters = useCallback(async () => {
+    useEffect(() => {
+        socket?.emit("addUser", userData.id)
+    }, [socket])
+
+    useEffect(() => {
+        arrivalMessages && currentChat?.members.includes(arrivalMessages.sender) &&
+            setMessages((prev) => [...prev, arrivalMessages])
+    }, [arrivalMessages, currentChat])
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            if (localStorage.getItem("userToken")) {
+                const jwtDecode = jwt(localStorage.getItem("userToken"));
+                const userValue = jwtDecode.user;
+                const [email, name, userRole, userId] = userValue.split(' ');
+                setUserRoleData(userRole)
+                setUserData({ ...userData, email, name, id: userId })
+            } else {
+                router.push("/login")
+            }
+        }
+    }, [])
+
+    const fetchConversations = useCallback(async () => {
         try {
-            const res = await fetch(`api/getTransporters`, {
+            const res = await fetch(`api/conversation?userId=${userData.id}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -35,7 +76,7 @@ const CreateOrder = () => {
                     // setResponseError(response.msg);
                 } else {
                     if (response.auth === false) router.push('/login')
-                    setTransporters(response);
+                    setConversations(response);
                 }
             } else {
                 console.log('error');
@@ -43,398 +84,129 @@ const CreateOrder = () => {
         } catch (error) {
             console.log('error');
         }
-    }, []);
+    }, [userData]);
+
+    const fetchMessages = useCallback(async () => {
+        try {
+            const res = await fetch(`api/getChat?userId=${currentChat._id}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'authorization': localStorage.getItem("userToken")
+                }
+            });
+
+            const response = await res.json();
+            if (res.status === 200) {
+                if (response.status === false) {
+                    // setResponseError(response.msg);
+                } else {
+                    if (response.auth === false) router.push('/login')
+                    console.log(response, 'messsages response');
+                    setMessages(response);
+                }
+            } else {
+                console.log('error');
+            }
+        } catch (error) {
+            console.log('error');
+        }
+    }, [currentChat, arrivalMessages]);
 
     useEffect(() => {
-        fetchTransporters();
-    }, [fetchTransporters]);
+        fetchMessages();
+    }, [currentChat, arrivalMessages]);
 
+    useEffect(() => {
+        fetchConversations();
+    }, [fetchConversations, userData]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setOrderData((prevState) => ({
-            ...prevState,
-            [name]: value,
-        }));
-    };
-
-    const handleCreateOrderSubmit = async () => {
-        if (orderData.transporter == '') {
-            setDropError({ ...dropError, transporterError: 'Please select a Transporter' })
-            return
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+        const message = {
+            sender: userData?.id,
+            text: newMessage,
+            conversationId: currentChat._id
         }
 
-        setDropError('')
-        const res = await fetch(`api/createOrder`, {
+        const receiverId = currentChat.members.find(member => member !== userData.id)
+
+        socket?.emit('send-message', {
+            senderId: userData.id,
+            receiverId: receiverId,
+            text: newMessage,
+        });
+
+        const res = await fetch(`api/newMessage`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'authorization': localStorage.getItem("userToken")
             },
-            body: JSON.stringify({ data: orderData })
+            body: JSON.stringify(message)
         });
 
         const response = await res.json()
         if (res.status === 200) {
             if (response.status === false) {
-                setResponseError(response.msg)
+
             } else {
                 if (response.auth === false) router.push('/login')
-                setOrderData({ from: '', to: '', quantity: '1ton', transporter: '' });
+                setNewMessage('')
+                setMessages([...messages, response])
             }
         } else {
-            console.log('CreateOrder error');
+            console.log('CreateOrder error', res);
         }
-    };
+
+    }
 
     return (
-        <Layout>
+        <Layout role={userRoleData}>
             <div className="block md:ml-[250px] p-4 w-full">
-                <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-white py-6">
-                    <div className="flex h-screen antialiased text-gray-800">
-                        <div className="flex flex-row h-full w-full overflow-x-hidden">
-                            <div className="flex flex-col py-8 pl-6 pr-2 w-64 bg-white flex-shrink-0">
-                                
-                                <div className="flex flex-col mt-8">
-                                    <div className="flex flex-row items-center justify-between text-xs">
-                                        <span className="font-bold">Active Conversations</span>
-                                        <span
-                                            className="flex items-center justify-center bg-gray-300 h-4 w-4 rounded-full"
-                                        >4</span
-                                        >
+                <div className="flex gap-4">
+                    <div className='flex flex-col gap-3 bg-white p-3 h-[95vh] overflow-y-scroll'>
+                        {
+                            conversations?.map((user) => {
+                                return (
+                                    <div onClick={() => setCurrentChat(user)} className='cursor-pointer'>
+                                        <Conversation conversation={user} userId={userData.id} />
                                     </div>
-                                    <div className="flex flex-col space-y-1 mt-4 -mx-2 h-48 overflow-y-auto">
-                                        <button
-                                            className="flex flex-row items-center hover:bg-gray-100 rounded-xl p-2"
-                                        >
-                                            <div
-                                                className="flex items-center justify-center h-8 w-8 bg-indigo-200 rounded-full"
-                                            >
-                                                H
-                                            </div>
-                                            <div className="ml-2 text-sm font-semibold">Henry Boyd</div>
-                                        </button>
-                                        <button
-                                            className="flex flex-row items-center hover:bg-gray-100 rounded-xl p-2"
-                                        >
-                                            <div
-                                                className="flex items-center justify-center h-8 w-8 bg-gray-200 rounded-full"
-                                            >
-                                                M
-                                            </div>
-                                            <div className="ml-2 text-sm font-semibold">Marta Curtis</div>
-                                            <div
-                                                className="flex items-center justify-center ml-auto text-xs text-white bg-red-500 h-4 w-4 rounded leading-none"
-                                            >
-                                                2
-                                            </div>
-                                        </button>
-                                        <button
-                                            className="flex flex-row items-center hover:bg-gray-100 rounded-xl p-2"
-                                        >
-                                            <div
-                                                className="flex items-center justify-center h-8 w-8 bg-orange-200 rounded-full"
-                                            >
-                                                P
-                                            </div>
-                                            <div className="ml-2 text-sm font-semibold">Philip Tucker</div>
-                                        </button>
-                                        <button
-                                            className="flex flex-row items-center hover:bg-gray-100 rounded-xl p-2"
-                                        >
-                                            <div
-                                                className="flex items-center justify-center h-8 w-8 bg-pink-200 rounded-full"
-                                            >
-                                                C
-                                            </div>
-                                            <div className="ml-2 text-sm font-semibold">Christine Reid</div>
-                                        </button>
-                                        <button
-                                            className="flex flex-row items-center hover:bg-gray-100 rounded-xl p-2"
-                                        >
-                                            <div
-                                                className="flex items-center justify-center h-8 w-8 bg-purple-200 rounded-full"
-                                            >
-                                                J
-                                            </div>
-                                            <div className="ml-2 text-sm font-semibold">Jerry Guzman</div>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex flex-col flex-auto h-full p-6">
-                                <div
-                                    className="flex flex-col flex-auto flex-shrink-0 rounded-2xl bg-gray-100 h-full p-4"
-                                >
-                                    <div className="flex flex-col h-full overflow-x-auto mb-4">
-                                        <div className="flex flex-col h-full">
-                                            <div className="grid grid-cols-12 gap-y-2">
-                                                <div className="col-start-1 col-end-8 p-3 rounded-lg">
-                                                    <div className="flex flex-row items-center">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative ml-3 text-sm bg-white py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div>Hey How are you today?</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-start-1 col-end-8 p-3 rounded-lg">
-                                                    <div className="flex flex-row items-center">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative ml-3 text-sm bg-white py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div>
-                                                                Lorem ipsum dolor sit amet, consectetur adipisicing
-                                                                elit. Vel ipsa commodi illum saepe numquam maxime
-                                                                asperiores voluptate sit, minima perspiciatis.
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-start-6 col-end-13 p-3 rounded-lg">
-                                                    <div className="flex items-center justify-start flex-row-reverse">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative mr-3 text-sm bg-indigo-100 py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div>I'm ok what about you?</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-start-6 col-end-13 p-3 rounded-lg">
-                                                    <div className="flex items-center justify-start flex-row-reverse">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative mr-3 text-sm bg-indigo-100 py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div>
-                                                                Lorem ipsum dolor sit, amet consectetur adipisicing. ?
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-start-1 col-end-8 p-3 rounded-lg">
-                                                    <div className="flex flex-row items-center">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative ml-3 text-sm bg-white py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div>Lorem ipsum dolor sit amet !</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-start-6 col-end-13 p-3 rounded-lg">
-                                                    <div className="flex items-center justify-start flex-row-reverse">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative mr-3 text-sm bg-indigo-100 py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div>
-                                                                Lorem ipsum dolor sit, amet consectetur adipisicing. ?
-                                                            </div>
-                                                            <div
-                                                                className="absolute text-xs bottom-0 right-0 -mb-5 mr-2 text-gray-500"
-                                                            >
-                                                                Seen
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-start-1 col-end-8 p-3 rounded-lg">
-                                                    <div className="flex flex-row items-center">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative ml-3 text-sm bg-white py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div>
-                                                                Lorem ipsum dolor sit amet consectetur adipisicing elit.
-                                                                Perspiciatis, in.
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-start-1 col-end-8 p-3 rounded-lg">
-                                                    <div className="flex flex-row items-center">
-                                                        <div
-                                                            className="flex items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0"
-                                                        >
-                                                            A
-                                                        </div>
-                                                        <div
-                                                            className="relative ml-3 text-sm bg-white py-2 px-4 shadow rounded-xl"
-                                                        >
-                                                            <div className="flex flex-row items-center">
-                                                                <button
-                                                                    className="flex items-center justify-center bg-indigo-600 hover:bg-indigo-800 rounded-full h-8 w-10"
-                                                                >
-                                                                    <svg
-                                                                        className="w-6 h-6 text-white"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                    >
-                                                                        <path
-                                                                            stroke-linecap="round"
-                                                                            stroke-linejoin="round"
-                                                                            stroke-width="1.5"
-                                                                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                                                                        ></path>
-                                                                        <path
-                                                                            stroke-linecap="round"
-                                                                            stroke-linejoin="round"
-                                                                            stroke-width="1.5"
-                                                                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                                        ></path>
-                                                                    </svg>
-                                                                </button>
-                                                                <div className="flex flex-row items-center space-x-px ml-4">
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-4 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-8 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-8 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-10 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-10 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-12 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-10 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-6 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-5 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-4 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-3 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-10 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-10 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-8 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-8 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-1 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-1 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-8 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-8 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-2 w-1 bg-gray-500 rounded-lg"></div>
-                                                                    <div className="h-4 w-1 bg-gray-500 rounded-lg"></div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div
-                                        className="flex flex-row items-center h-16 rounded-xl bg-white w-full px-4"
-                                    >
-                                        <div>
-                                            <button
-                                                className="flex items-center justify-center text-gray-400 hover:text-gray-600"
-                                            >
-                                                <svg
-                                                    className="w-5 h-5"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                >
-                                                    <path
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                                                    ></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                        <div className="flex-grow ml-4">
-                                            <div className="relative w-full">
-                                                <input
-                                                    type="text"
-                                                    className="flex w-full border rounded-xl focus:outline-none focus:border-indigo-300 pl-4 h-10"
-                                                />
-                                                <button
-                                                    className="absolute flex items-center justify-center h-full w-12 right-0 top-0 text-gray-400 hover:text-gray-600"
-                                                >
-                                                    <svg
-                                                        className="w-6 h-6"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                    >
-                                                        <path
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                        ></path>
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="ml-4">
-                                            <button
-                                                className="flex items-center justify-center bg-indigo-500 hover:bg-indigo-600 rounded-xl text-white px-4 py-1 flex-shrink-0"
-                                            >
-                                                <span>Send</span>
-                                                <span className="ml-2">
-                                                    <svg
-                                                        className="w-4 h-4 transform rotate-45 -mt-px"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                    >
-                                                        <path
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                                                        ></path>
-                                                    </svg>
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                )
+                            })
+                        }
                     </div>
+
+                    <div className='flex-1 bg-white p-3 overflow-y-scroll relative'>
+                        {
+                            currentChat ? <>
+                                <div className='flex gap-2 bg-gray-100 p-2 items-center rounded-md mb-4'>
+                                    <img src="https://img.freepik.com/free-icon/user_318-563642.jpg?q=10&h=200" alt="" className='w-10 h-10 rounded-full overflow-hidden' />
+                                    <div>
+                                        <h2><strong></strong></h2>
+                                    </div>
+                                </div>
+                                <div className='h-[75vh] overflow-y-scroll'>
+                                    {
+                                        messages?.map((msg) => {
+                                            return (
+                                                <MsgContent message={msg} own={msg.sender === userData.id} />
+                                            )
+                                        })
+                                    }
+                                </div>
+                                <div className='absolute bottom-4 left-5 w-[96%]'>
+                                    <form onSubmit={handleSubmit}>
+                                        <div className='bg-gray-100 p-2 flex items-center mb-2'>
+                                            <input type="text" className='bg-gray-100 outline-none text-sm flex-1' value={newMessage} onChange={(e) => setNewMessage(e.target.value)} required />
+                                            <button type='submit' className='bg-black text-white p-1 px-2'>Send</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </> : <h2>Open a conversation to start a chat.</h2>
+                        }
+                    </div>
+
                 </div>
             </div>
         </Layout>

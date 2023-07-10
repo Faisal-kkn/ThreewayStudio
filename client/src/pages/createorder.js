@@ -7,9 +7,12 @@ import { useForm } from "react-hook-form";
 import FormInput from '../../components/FormInput';
 import Button from '../../components/Button';
 import Layout from '../../components/Layout';
+import { useSocketContext } from '../../context/socket'
+
 
 const CreateOrder = () => {
 
+    const { socket } = useSocketContext();
     const router = useRouter();
 
     const { register, handleSubmit, watch, formState: { errors } } = useForm();
@@ -20,14 +23,22 @@ const CreateOrder = () => {
     const [transporters, setTransporters] = useState([])
 
     const [userRoleData, setUserRoleData] = useState('');
+    const [userData, setUserData] = useState({
+        id: '',
+        name: '',
+        email: ''
+    })
+
+
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
             if (localStorage.getItem("userToken")) {
                 const jwtDecode = jwt(localStorage.getItem("userToken"));
                 const userValue = jwtDecode.user;
-                const [email, name, userRole] = userValue.split(' ');
+                const [email, name, userRole, userId] = userValue.split(' ');
                 setUserRoleData(userRole)
+                setUserData({ ...userData, email, name, id: userId })
             } else {
                 router.push("/login")
             }
@@ -87,8 +98,38 @@ const CreateOrder = () => {
             },
             body: JSON.stringify({ data: orderData })
         });
-
         const response = await res.json()
+
+        socket?.emit('send-message', {
+            senderId: userData.id,
+            receiverId: orderData.transporter,
+            text: `You have a New Order. Order id: ${response?.OrderID}`,
+        });
+
+        const singleConversation = await fetch(`api/getSingleConversation?senderId=${userData.id}&receiverId=${orderData.transporter}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'authorization': localStorage.getItem("userToken")
+            },
+        });
+        const singleConversationResponse = await singleConversation.json()
+
+        const message = {
+            sender: userData?.id,
+            text: `You have a New Order. Order id: ${response?.OrderID}`,
+            conversationId: singleConversationResponse._id
+        }
+
+        const newMsgRes = await fetch(`api/newMessage`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'authorization': localStorage.getItem("userToken")
+            },
+            body: JSON.stringify(message)
+        });
+
         if (res.status === 200) {
             if (response.status === false) {
                 setResponseError(response.msg)

@@ -15,7 +15,7 @@ function Home() {
       if (localStorage.getItem("userToken")) {
         const jwtDecode = jwt(localStorage.getItem("userToken"));
         const userValue = jwtDecode.user;
-        const [email, name, userRole] = userValue.split(' ');
+        const [email, name, userRole, userId] = userValue.split(' ');
         setRole(userRole)
       } else {
         router.push("/login")

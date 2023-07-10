@@ -19,7 +19,7 @@ export default {
         try {
             const decodedToken = Jwt.verify(req.headers.authorization, process.env.USER_JWT_SECRET);
             const userValue = decodedToken.user;
-            const [email, name] = userValue.split(' ');
+            const [email, name, userRole, userId] = userValue.split(' ');
             const getUser = await authenticationSchema.findOne({ email })
 
             const orders = await manufacturerFormSchema.find({ transporter: getUser._id })
